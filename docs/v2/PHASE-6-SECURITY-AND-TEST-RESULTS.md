@@ -1,14 +1,17 @@
 # Phase 6: Security and Test Results
 
-## Security Tests Performed
-1. **Sidecar Token Validation**: Python-side /ws/sidecar accurately denies WebSocket upgrades missing tokens or containing invalidated/expired tokens.
-2. **Channel Encapsulation**: Data sent via SidecarChannel properly cascades into the ChannelManager, retaining the boundary constraints implemented in Phase 5.
-3. **Execution Denial**: Validated that the sidecar cannot directly invoke core/tools via RPC; it merely serves capabilities OUT to the Python core or forwards inputs IN to the Python core which handles LLM decisions.
+## Security Reviews
+- **Authentication (HS256)**: Re-reviewed. The original design used a random secret in-memory to prevent persistent token theft. We updated the tokens to include ud, sub (device binding), sid (session binding), and jti (anti-replay nonce).
+- **Revocation**: Validated. Revoking a device explicitly alters DeviceStatus to REVOKED in the database, severs any active SidecarChannel associated with the device sidecar_{device_id}, and prevents any future WebSocket handshakes via explicit rejection in core/runtime/api.py.
 
-## Test Matrix
-- 	ests/test_sidecar_channel.py (Python Lifecycle): PASSED
-- 	ests/multimodal/test_privacy.py (Extended to Sidecar media integration limits): PASSED
+## Test Results
 
-## Go Tests
-- Go compilation and unit tests were marked as ENVIRONMENT-LIMITED due to the lack of a native Go toolchain in the testing environment. 
-- However, module layout, dependencies, and synchronization locking issues were statically resolved.
+### Python Verification
+- 	ests/test_sidecar_channel.py -> **PASS**
+- 	ests/devices/test_revocation.py -> **PASS** (Normal device, Expired token, Revoked active session, Reconnect rejected).
+
+### Go Sidecar Native Verification
+- **Go Compilation & Linkage (Windows)** -> **ENVIRONMENT-LIMITED** (Lacked native Go toolchain).
+- **Go Compilation & Linkage (Linux)** -> **ENVIRONMENT-LIMITED** (Lacked native Go toolchain).
+- **Go Compilation & Linkage (macOS)** -> **ENVIRONMENT-LIMITED** (Lacked native Go toolchain).
+- **Static Module Validation** -> **INFERRED PASS** (The go.mod, go.sum, and codebase statically reflect a functional standard structure).

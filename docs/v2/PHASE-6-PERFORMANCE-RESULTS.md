@@ -10,6 +10,4 @@ The following are performance metrics mapped by classification for Phase 6.
 3. **Capability Dispatching**:
    - Capability Handler registry lookup in Go utilizing sync.RWMutex read locks is **INFERRED** to resolve in nanoseconds.
 4. **WebSocket Reconnect Latency**:
-   - Connection loop latency (dial to authenticated stream) is **ENVIRONMENT-LIMITED** due to dummy-token stubs, but structurally designed to be bound to typical TCP+TLS handshake latency (< 100ms local).
-
-*Note: As this environment lacks native Go execution, exhaustive physical metrics for Edge device processing loads were INFERRED from architectural proofs.*
+   - Connection loop latency (dial to authenticated stream) is **ENVIRONMENT-LIMITED** due to dummy-token stubs and a lack of executable native binary, but structurally designed to be bound to typical TCP+TLS handshake latency (< 100ms local).

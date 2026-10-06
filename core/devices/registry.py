@@ -104,5 +104,20 @@ class DeviceRegistry:
             return [self._row_to_device(row) for row in cursor.fetchall()]
 
     def revoke_device(self, device_id: str):
+        logger.warning(f"AUDIT: Revoking device {device_id}")
         self.update_status(device_id, DeviceStatus.REVOKED)
         self.update_connection_state(device_id, ConnectionState.DISCONNECTED)
+        
+        # Invalidate active session where practical
+        try:
+            from core.runtime.api import _runtime
+            if _runtime and hasattr(_runtime, 'channel_manager'):
+                channel_id = f"sidecar_{device_id}"
+                channel = _runtime.channel_manager.get_channel(channel_id)
+                if channel:
+                    import asyncio
+                    logger.info(f"AUDIT: Severing active connection for revoked device {device_id}")
+                    # Dispatch fire-and-forget channel termination
+                    asyncio.create_task(channel.stop())
+        except Exception as e:
+            logger.error(f"Error invalidating active session for {device_id}: {e}")

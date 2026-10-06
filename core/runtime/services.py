@@ -147,3 +147,35 @@ class ApiService:
         
     def status(self) -> ServiceStatus:
         return self._status
+
+from core.workflows.engine import WorkflowEngine
+from core.workflows.store import WorkflowStore
+from core.workflows.events import EventBus
+from pathlib import Path
+import asyncio
+
+class WorkflowService:
+    @property
+    def name(self) -> str:
+        return "WorkflowService"
+        
+    def __init__(self, db_path: Path):
+        self.store = WorkflowStore(db_path)
+        self.event_bus = EventBus()
+        self.engine = WorkflowEngine(self.store, self.event_bus)
+        self._status = ServiceStatus.STOPPED
+
+    async def start(self) -> None:
+        self._status = ServiceStatus.STARTING
+        self.event_bus.start()
+        await self.engine.start()
+        self._status = ServiceStatus.RUNNING
+        
+    async def stop(self) -> None:
+        self._status = ServiceStatus.STOPPING
+        await self.engine.stop()
+        await self.event_bus.stop()
+        self._status = ServiceStatus.STOPPED
+        
+    def status(self) -> ServiceStatus:
+        return self._status

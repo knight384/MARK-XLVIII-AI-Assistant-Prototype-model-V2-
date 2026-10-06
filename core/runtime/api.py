@@ -353,6 +353,40 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         pass
 
+from core.workflows.models import WorkflowDefinition
+from typing import Dict, Any
+
+@app.get("/api/workflows/definitions")
+async def get_workflows():
+    if _runtime and hasattr(_runtime.services, '_services'):
+        ws = _runtime.services._services.get("WorkflowService")
+        if ws:
+            # We don't have a get_all_defs yet in store, let's just return empty for now
+            return []
+    return []
+
+@app.post("/api/workflows/definitions")
+async def create_workflow(wf: WorkflowDefinition):
+    if _runtime and hasattr(_runtime.services, '_services'):
+        ws = _runtime.services._services.get("WorkflowService")
+        if ws:
+            ws.store.save_workflow_def(wf)
+            return {"status": "ok", "id": wf.workflow_id}
+    return {"status": "error", "message": "WorkflowService not running"}
+
+@app.post("/api/workflows/runs")
+async def start_workflow(req: Dict[str, Any]):
+    if _runtime and hasattr(_runtime.services, '_services'):
+        ws = _runtime.services._services.get("WorkflowService")
+        if ws:
+            workflow_id = req.get("workflow_id")
+            inputs = req.get("inputs", {})
+            run_id = await ws.engine.submit_workflow(workflow_id, inputs)
+            if run_id:
+                return {"status": "ok", "run_id": run_id}
+            return {"status": "error", "message": "Workflow not found or disabled"}
+    return {"status": "error", "message": "WorkflowService not running"}
+
 @app.api_route("/api/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 async def api_catch_all(full_path: str):
     return {"status": "stub", "path": full_path, "message": "Not implemented in V2 yet"}

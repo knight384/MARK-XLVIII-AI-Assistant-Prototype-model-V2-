@@ -331,6 +331,10 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             data = await websocket.receive_text()
+            if len(data) > 1024 * 1024:
+                await websocket.close(code=1009, reason="Message too large")
+                break
+            
             # UI sends {"type": "chat_message", "text": "..."}
             import json
             try:

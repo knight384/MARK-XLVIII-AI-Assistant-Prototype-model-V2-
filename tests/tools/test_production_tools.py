@@ -46,7 +46,7 @@ def test_critical_risk_tools_are_the_expected_ones():
 
 def test_high_risk_tools_are_the_expected_ones():
     high = {t.name for t in REGISTRY.list() if t.metadata.risk_level == RiskLevel.HIGH}
-    assert high == {"browser_control", "file_controller", "code_helper", "computer_control"}
+    assert high == {"browser_control", "file_controller", "code_helper", "computer_control", "developer_github_create_repository", "developer_git_push"}
 
 
 # -- mocked execution for each tool ------------------------------------
@@ -310,3 +310,4 @@ async def test_screen_process_tool_missing_live_context_fails_gracefully():
     tool = REGISTRY.get("screen_process")
     result = await tool.execute({"text": "what is this"}, ToolContext())  # no 'live' in extra
     assert result.success is False
+

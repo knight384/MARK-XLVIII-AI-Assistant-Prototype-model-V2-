@@ -14,41 +14,42 @@ def setup_runtime():
     set_runtime(None)
 
 def test_health_endpoint():
-    response = client.get("/health")
+    response = client.get("/api/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
     assert response.json()["mode"] == "HEADLESS"
 
 def test_identity_endpoint():
-    response = client.get("/identity")
+    response = client.get("/api/identity")
     assert response.status_code == 200
     assert "identity" in response.json()
 
 def test_capabilities_endpoint():
-    response = client.get("/capabilities")
+    response = client.get("/api/capabilities")
     assert response.status_code == 200
     assert "capabilities" in response.json()
     assert len(response.json()["capabilities"]) > 0
 
 def test_models_endpoint():
-    response = client.get("/models")
+    response = client.get("/api/models")
     assert response.status_code == 200
     assert "providers" in response.json()
 
 def test_task_submission_and_status():
-    response = client.post("/tasks", json={"goal": "say hello"})
+    response = client.post("/api/tasks", json={"goal": "say hello"})
     assert response.status_code == 200
     task_id = response.json()["task_id"]
     
-    status_resp = client.get(f"/tasks/{task_id}")
+    status_resp = client.get(f"/api/tasks/{task_id}")
     assert status_resp.status_code == 200
     assert status_resp.json()["status"] in ["CREATED", "PLANNING", "QUEUED", "RUNNING", "FAILED"]
 
 def test_task_cancellation():
-    response = client.post("/tasks", json={"goal": "sleep for 10 seconds"})
+    response = client.post("/api/tasks", json={"goal": "sleep for 10 seconds"})
     assert response.status_code == 200
     task_id = response.json()["task_id"]
     
-    cancel_resp = client.post(f"/tasks/{task_id}/cancel")
+    cancel_resp = client.post(f"/api/tasks/{task_id}/cancel")
     assert cancel_resp.status_code == 200
     assert cancel_resp.json()["status"] == "cancelling"
+

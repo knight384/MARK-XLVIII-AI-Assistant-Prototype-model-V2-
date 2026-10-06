@@ -20,7 +20,10 @@ PRE_PHASE_3_TOOL_NAMES = {
     "reminder", "youtube_video", "screen_process", "close_camera", "computer_settings",
     "browser_control", "file_controller", "desktop_control", "code_helper", "dev_agent",
     "computer_control", "game_updater", "flight_finder", "shutdown_jarvis",
-    "file_processor", "save_memory",
+    "file_processor", "save_memory", "developer_git_status", "developer_code_search",
+    "developer_github_create_repository", "developer_git_commit", "developer_source_context",
+    "developer_git_log", "developer_project_inspect", "developer_git_push",
+    "developer_git_diff", "developer_github_repository"
 }
 
 
@@ -63,3 +66,4 @@ def test_registry_generated_declarations_match_gemini_schema_shape():
     for decl in declarations:
         assert decl["parameters"]["type"] == "OBJECT"
         assert "required" in decl["parameters"]
+

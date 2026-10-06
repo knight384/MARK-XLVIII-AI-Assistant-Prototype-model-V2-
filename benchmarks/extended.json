@@ -1,0 +1,23 @@
+{
+  "environment": {
+    "os": "Windows",
+    "os_release": "11",
+    "cpu": "Intel64 Family 6 Model 186 Stepping 3, GenuineIntel",
+    "python_version": "3.14.4",
+    "cpu_count": 12
+  },
+  "results": {
+    "Developer": {
+      "source_context_latency_ms": {
+        "value": 0.4745790000015404,
+        "unit": "ms"
+      }
+    },
+    "LLM": {
+      "routing_overhead_ms": {
+        "value": 0.0014765999949304387,
+        "unit": "ms"
+      }
+    }
+  }
+}

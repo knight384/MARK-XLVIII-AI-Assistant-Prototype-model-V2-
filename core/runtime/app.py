@@ -39,7 +39,12 @@ class MarkRuntime:
         # TODO: Register core services (Memory, Policy, Orchestrator, WS/API)
         from core.runtime.services import ApiService, WorkflowService
         self.services.register(ApiService(port=8000))
-        data_dir = base_dir / 'data'
+        import sys
+        if getattr(sys, "frozen", False):
+            base_dir = Path(sys.executable).parent
+        else:
+            base_dir = Path(__file__).resolve().parents[2]
+        data_dir = base_dir / '.data'
         data_dir.mkdir(exist_ok=True)
         self.services.register(WorkflowService(db_path=data_dir / 'workflows.sqlite'))
         from core.runtime.api import set_runtime

@@ -95,13 +95,19 @@ def configure_logging(level: int = logging.INFO,
     root = logging.getLogger()
     root.setLevel(level)
 
+    try:
+        from core.observability.logger import configure_structured_logging
+        configure_structured_logging(level)
+    except ImportError:
+        pass
+
     fmt = logging.Formatter(
         "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
 
     console = logging.StreamHandler(stream=sys.stdout)
-    console.setFormatter(fmt)
+    # We don't set formatter here, configure_structured_logging will override it later if available
     console.addFilter(_sensitive_filter)
     root.addHandler(console)
 
@@ -112,13 +118,21 @@ def configure_logging(level: int = logging.INFO,
             file_handler = logging.handlers.RotatingFileHandler(
                 log_dir / "jarvis.log", maxBytes=2_000_000, backupCount=3, encoding="utf-8",
             )
-            file_handler.setFormatter(fmt)
             file_handler.addFilter(_sensitive_filter)
             root.addHandler(file_handler)
         except Exception:
             # Logging setup must never crash the app; console logging above
             # is already in place as a fallback.
             root.warning("Could not set up file logging; console logging only.")
+
+    try:
+        from core.observability.logger import StructuredFormatter
+        formatter = StructuredFormatter()
+        for handler in root.handlers:
+            handler.setFormatter(formatter)
+    except ImportError:
+        for handler in root.handlers:
+            handler.setFormatter(fmt)
 
     # Quiet down noisy third-party libraries at INFO/DEBUG unless the user
     # explicitly wants verbose output from them.

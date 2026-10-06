@@ -33,6 +33,25 @@ async def health():
         raise HTTPException(status_code=503, detail="Runtime not initialized")
     return {"status": "ok", "mode": _runtime.mode.name}
 
+@app.get("/api/ready")
+async def ready():
+    from core.observability import observability_service
+    diag = await observability_service.get_diagnostics()
+    if diag.get("status") != "ready":
+        raise HTTPException(status_code=503, detail="Runtime degraded or not ready")
+    return {"status": "ready"}
+
+@app.get("/api/health/components")
+async def health_components():
+    from core.observability import observability_service
+    diag = await observability_service.get_diagnostics()
+    return diag.get("health", {})
+
+@app.get("/api/diagnostics")
+async def diagnostics():
+    from core.observability import observability_service
+    return await observability_service.get_diagnostics()
+
 @app.get("/api/identity")
 async def identity():
     if not _runtime:

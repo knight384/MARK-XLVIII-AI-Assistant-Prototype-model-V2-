@@ -24,6 +24,7 @@ from .base import AuditHook, Tool, ToolContext, ToolEvent, default_audit_hook
 from .errors import ToolNotFoundError, ToolTimeoutError
 from .registry import ToolRegistry
 from .results import ToolResult
+from core.observability import registry
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +81,7 @@ class ToolExecutor:
 
     async def execute(self, tool_name: str, args: dict, context: ToolContext) -> ToolResult:
         t0 = time.perf_counter()
+        asyncio.create_task(registry.inc("tool_execution_requested"))
         tool = self._registry.get(tool_name)
 
         if tool is None:
@@ -111,6 +113,7 @@ class ToolExecutor:
                 decision="DENY", source=context.source, result_status="denied",
                 metadata={"reason": policy_result.reason},
             ))
+            asyncio.create_task(registry.inc("tool_execution_denied"))
             return ToolResult.fail(
                 tool_name, error=policy_result.reason, error_type="PolicyDeniedError",
                 message=f"'{tool_name}' was denied by policy: {policy_result.reason}",
@@ -144,6 +147,7 @@ class ToolExecutor:
 
         # 3. Execute (unchanged from Phase 3, plus audit calls).
         self._emit(ToolEvent(type="started", tool_name=tool_name, request_id=context.request_id))
+        asyncio.create_task(registry.inc("tool_execution_started"))
 
         try:
             timeout = tool.metadata.timeout_seconds
@@ -161,6 +165,7 @@ class ToolExecutor:
                 agent_id=context.agent_id, tool_name=tool_name, risk_level=tool.metadata.risk_level.value,
                 decision="ALLOW", source=context.source, duration_ms=duration_ms, result_status="timeout",
             ))
+            asyncio.create_task(registry.inc("tool_execution_failed"))
             return ToolResult.fail(tool_name, error=str(err), error_type="ToolTimeoutError",
                                     duration_ms=duration_ms)
         except Exception as exc:
@@ -173,6 +178,7 @@ class ToolExecutor:
                 agent_id=context.agent_id, tool_name=tool_name, risk_level=tool.metadata.risk_level.value,
                 decision="ALLOW", source=context.source, duration_ms=duration_ms, result_status="failed",
             ))
+            asyncio.create_task(registry.inc("tool_execution_failed"))
             return ToolResult.fail(
                 tool_name, error=str(exc), error_type=type(exc).__name__,
                 message=f"Tool '{tool_name}' failed: {exc}", duration_ms=duration_ms,
@@ -203,6 +209,11 @@ class ToolExecutor:
             decision="ALLOW", source=context.source, duration_ms=duration_ms,
             result_status="completed" if result.success else "failed",
         ))
+        if result.success:
+            asyncio.create_task(registry.inc("tool_execution_completed"))
+        else:
+            asyncio.create_task(registry.inc("tool_execution_failed"))
+        asyncio.create_task(registry.observe("tool_execution_duration", duration_ms))
         return result
 
     def _evaluate_policy(self, tool: Tool, args: dict, context: ToolContext):

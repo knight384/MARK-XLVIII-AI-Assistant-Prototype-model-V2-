@@ -2,6 +2,7 @@ import asyncio
 import time
 import logging
 from typing import Dict, List, Optional
+from core.observability import registry, TraceContext
 from core.workflows.models import (
     WorkflowDefinition, WorkflowRun, WorkflowStepRun, WorkflowEvent,
     WorkflowState, StepState, EventType, NodeType, WorkflowStepDef
@@ -93,6 +94,7 @@ class WorkflowEngine:
         run = WorkflowRun(workflow_id=workflow_id, inputs=inputs, state=WorkflowState.RUNNING, started_at=time.time())
         ev = WorkflowEvent(workflow_run_id=run.run_id, event_type=EventType.WORKFLOW_STARTED, payload={"inputs": inputs})
         self.store.save_run(run, [ev])
+        asyncio.create_task(registry.inc("workflow_started"))
         return run.run_id
 
     async def _on_workflow_started(self, event: WorkflowEvent):
@@ -120,6 +122,7 @@ class WorkflowEngine:
             event_type=EventType.STEP_QUEUED
         )
         self.store.save_step_run(step_run, [ev])
+        asyncio.create_task(registry.inc("workflow_step_queued"))
 
     async def _on_step_queued(self, event: WorkflowEvent):
         await self._work_queue.put(event.step_run_id)
@@ -140,6 +143,9 @@ class WorkflowEngine:
             run.completed_at = time.time()
             ev = WorkflowEvent(workflow_run_id=run.run_id, event_type=EventType.WORKFLOW_COMPLETED)
             self.store.save_run(run, [ev])
+            asyncio.create_task(registry.inc("workflow_completed"))
+            if run.started_at:
+                asyncio.create_task(registry.observe("workflow_duration", run.completed_at - run.started_at))
             return
 
         # Queue new steps
@@ -161,10 +167,12 @@ class WorkflowEngine:
             run.completed_at = time.time()
             ev = WorkflowEvent(workflow_run_id=run.run_id, event_type=EventType.WORKFLOW_FAILED)
             self.store.save_run(run, [ev])
+            asyncio.create_task(registry.inc("workflow_failed"))
 
     async def _worker_loop(self, worker_id: int):
         while self._running:
             try:
+                asyncio.create_task(registry.set_gauge("workflow_queue_depth", self._work_queue.qsize()))
                 step_run_id = await self._work_queue.get()
                 try:
                     await self._execute_step(step_run_id)
@@ -191,6 +199,7 @@ class WorkflowEngine:
         step_run.attempt += 1
         ev_start = WorkflowEvent(workflow_run_id=run.run_id, step_run_id=step_run.step_run_id, event_type=EventType.STEP_STARTED)
         self.store.save_step_run(step_run, [ev_start])
+        asyncio.create_task(registry.inc("workflow_step_started"))
         
         node = self._nodes.get(step_def.configuration.node_type)
         if not node:
@@ -199,6 +208,7 @@ class WorkflowEngine:
             step_run.completed_at = time.time()
             ev = WorkflowEvent(workflow_run_id=run.run_id, step_run_id=step_run.step_run_id, event_type=EventType.STEP_FAILED, payload={"error": step_run.error})
             self.store.save_step_run(step_run, [ev])
+            asyncio.create_task(registry.inc("workflow_step_failed"))
             return
             
         try:
@@ -214,14 +224,18 @@ class WorkflowEngine:
                 step_run.outputs = result.outputs
                 ev = WorkflowEvent(workflow_run_id=run.run_id, step_run_id=step_run.step_run_id, event_type=EventType.STEP_COMPLETED, payload=result.outputs)
                 self.store.save_step_run(step_run, [ev])
+                asyncio.create_task(registry.inc("workflow_step_completed"))
+                asyncio.create_task(registry.observe("workflow_step_duration", step_run.completed_at - step_run.started_at))
             else:
                 step_run.state = StepState.FAILED
                 step_run.error = result.error
                 ev = WorkflowEvent(workflow_run_id=run.run_id, step_run_id=step_run.step_run_id, event_type=EventType.STEP_FAILED, payload={"error": result.error})
                 self.store.save_step_run(step_run, [ev])
+                asyncio.create_task(registry.inc("workflow_step_failed"))
         except Exception as e:
             step_run.state = StepState.FAILED
             step_run.error = str(e)
             step_run.completed_at = time.time()
             ev = WorkflowEvent(workflow_run_id=run.run_id, step_run_id=step_run.step_run_id, event_type=EventType.STEP_FAILED, payload={"error": str(e)})
             self.store.save_step_run(step_run, [ev])
+            asyncio.create_task(registry.inc("workflow_step_failed"))

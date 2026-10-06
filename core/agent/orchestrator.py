@@ -10,7 +10,8 @@ child agents or talk to each other directly (spec Part 22-23).
 from __future__ import annotations
 
 import logging
-
+import asyncio
+from core.observability import registry
 from core.tools.base import CancellationToken
 
 from .agents import register_all_agents
@@ -95,9 +96,11 @@ class Orchestrator:
                         config=None) -> Task:
         task.observations.append(Observation(source="system", type="task_created", content=goal))
         logger.info("[Orchestrator] Task created: %s (id=%s)", goal, task.task_id)
+        asyncio.create_task(registry.inc("agent_task_created"))
 
         if cancellation_token.is_cancelled:
             task.set_status(TaskStatus.CANCELLED)
+            asyncio.create_task(registry.inc("agent_task_cancelled"))
             return task
 
         task.set_status(TaskStatus.PLANNING)
@@ -106,6 +109,7 @@ class Orchestrator:
             steps = await self._planner.plan(goal, memory_context=relevant_memory_text)
         except InvalidPlanError as exc:
             task.set_status(TaskStatus.FAILED)
+            asyncio.create_task(registry.inc("agent_task_failed"))
             task.errors.append(str(exc))
             task.observations.append(Observation(source="system", type="planning_failed", content=str(exc)))
             logger.error("[Orchestrator] Planning failed for task %s: %s", task.task_id, exc)
@@ -113,6 +117,7 @@ class Orchestrator:
 
         if len(steps) > self._max_execution_steps:
             task.set_status(TaskStatus.FAILED)
+            asyncio.create_task(registry.inc("agent_task_failed"))
             err = (f"Plan has {len(steps)} steps, exceeding max_execution_steps="
                    f"{self._max_execution_steps} (loop protection).")
             task.errors.append(err)
@@ -145,6 +150,7 @@ class Orchestrator:
             for step_id in list(remaining.keys()):
                 if cancellation_token.is_cancelled:
                     task.set_status(TaskStatus.CANCELLED)
+                    asyncio.create_task(registry.inc("agent_task_cancelled"))
                     for s in remaining.values():
                         s.status = StepStatus.CANCELLED
                     logger.info("[Orchestrator] Task %s cancelled.", task.task_id)
@@ -168,6 +174,7 @@ class Orchestrator:
                 delegations += 1
                 if delegations > self._max_delegations:
                     task.set_status(TaskStatus.FAILED)
+                    asyncio.create_task(registry.inc("agent_task_failed"))
                     task.errors.append(
                         f"Exceeded max_delegations={self._max_delegations} (loop protection)."
                     )
@@ -186,6 +193,10 @@ class Orchestrator:
             step.error = "Skipped: unresolved dependency (loop protection stopped the scheduler)."
 
         task.set_status(TaskStatus.COMPLETED if task.is_fully_successful() else TaskStatus.FAILED)
+        if task.status == TaskStatus.COMPLETED:
+            asyncio.create_task(registry.inc("agent_task_completed"))
+        else:
+            asyncio.create_task(registry.inc("agent_task_failed"))
         task.observations.append(Observation(
             source="system", type="task_finished", content=task.summary(),
         ))

@@ -53,6 +53,8 @@ class MarkRuntime:
         
     async def start(self):
         """Phase 2: Start all registered services in order."""
+        from core.observability import observability_service
+        await observability_service.start()
         await self.services.start_all()
         await self.channel_manager.start()
         logger.info(f"[Runtime] MARK XLVIII Runtime Started (ID: {self.identity.runtime_id})")
@@ -66,6 +68,8 @@ class MarkRuntime:
         logger.info("[Runtime] Shutting down MARK XLVIII...")
         await self.channel_manager.stop()
         await self.services.stop_all()
+        from core.observability import observability_service
+        await observability_service.stop()
         logger.info("[Runtime] Shutdown complete.")
 
     def trigger_shutdown(self):

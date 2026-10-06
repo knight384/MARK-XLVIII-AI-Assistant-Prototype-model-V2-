@@ -434,13 +434,22 @@ async def websocket_sidecar(websocket: WebSocket):
             await websocket.close(code=1008, reason="Token device mismatch")
             return
         
-        # Check revocation
+        # Check revocation and registration
         from core.devices.registry import get_default_device_registry
         from core.devices.models import DeviceStatus
         reg = get_default_device_registry()
-        dev = reg.get_device(device_id)
-        if dev and dev.status == DeviceStatus.REVOKED:
+        dev = reg.get_device(sub)
+        
+        if not dev:
+            await websocket.close(code=1008, reason="Unknown device")
+            return
+            
+        if dev.status == DeviceStatus.REVOKED:
             await websocket.close(code=1008, reason="Device revoked")
+            return
+            
+        if dev.status != DeviceStatus.ENROLLED:
+            await websocket.close(code=1008, reason="Device not enrolled")
             return
 
     except Exception as e:

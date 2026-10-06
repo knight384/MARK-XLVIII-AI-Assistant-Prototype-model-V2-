@@ -8,8 +8,8 @@ All identified vulnerabilities during the audit have been successfully verified 
 ## Audit Findings & Remediation
 
 ### 1. Hardcoded Credentials & Authentication Bypasses (REMEDIATED)
-- **Finding**: The `core/runtime/api.py` endpoint for Sidecar WebSocket authentication (`/ws/sidecar`) contained a hardcoded bypass (`token != "dummy_token"`), allowing unauthorized device registration and bypassing HS256 JWT checks. Additionally, identity mismatches and revocation checks were bypassed due to incorrect control flow.
-- **Remediation**: The `dummy_token` conditional was successfully removed. JWT signature verification and device-revocation checks are now mandatory for all connections. Identity mismatches correctly abort the connection before processing.
+- **Finding**: The `core/runtime/api.py` endpoint for Sidecar WebSocket authentication (`/ws/sidecar`) contained a hardcoded bypass (`token != "dummy_token"`), allowing unauthorized device registration and bypassing HS256 JWT checks. Additionally, identity mismatches, revocation checks, and unknown device registrations were bypassed due to incorrect control flow. The regression test for successful authentication was weak and did not prove successful post-authentication channel registration.
+- **Remediation**: The `dummy_token` conditional was successfully removed. JWT signature verification, strict device-registry lookups (blocking unknown devices), and device-revocation checks are now mandatory for all connections. Identity mismatches correctly abort the connection before processing. The regression test `test_sidecar_accepts_valid_matching_device` was strengthened to poll the `ChannelManager` and explicitly verify successful channel registration using the authenticated identity.
 
 ### 2. Network Exposure & Unauthenticated API (REMEDIATED)
 - **Finding**: The core FastApi service (`ApiService` in `core/runtime/services.py`) was binding to `0.0.0.0` by default. Given the lack of robust API key / OAuth2 protection on core REST endpoints (e.g., `/api/tasks`), this introduced remote execution risks.

@@ -51,6 +51,17 @@ def setup_registry():
     
     yield reg
 
+from core.runtime.app import MarkRuntime
+from core.runtime.mode import RuntimeMode
+from core.runtime.api import set_runtime
+
+@pytest.fixture(autouse=True)
+def setup_runtime():
+    rt = MarkRuntime(mode=RuntimeMode.HEADLESS)
+    set_runtime(rt)
+    yield rt
+    set_runtime(None)
+
 def test_sidecar_rejects_invalid_token():
     with pytest.raises(WebSocketDisconnect) as exc:
         with client.websocket_connect("/ws/sidecar") as websocket:
@@ -67,7 +78,7 @@ def test_sidecar_rejects_expired_token():
         "jti": str(uuid.uuid4()),
         "aud": "mark_v2_core",
         "iat": now - timedelta(hours=2),
-        "exp": now - timedelta(hours=1),  # Expired
+        "exp": now - timedelta(hours=1),
         "iss": "mark_v2_core"
     }
     expired_token = jwt.encode(payload, _JWT_SECRET, algorithm="HS256")
@@ -77,17 +88,32 @@ def test_sidecar_rejects_expired_token():
             websocket.send_json({"token": expired_token, "device_id": "test_device_valid"})
             websocket.receive_text()
     assert exc.value.code == 1008
+
+def test_sidecar_rejects_missing_token():
+    with pytest.raises(WebSocketDisconnect) as exc:
+        with client.websocket_connect("/ws/sidecar") as websocket:
+            websocket.send_json({"device_id": "test_device_valid"})
+            websocket.receive_text()
+    assert exc.value.code == 1008
     assert "Invalid or expired token" in exc.value.reason
 
 def test_sidecar_rejects_device_id_mismatch():
     token = issue_device_token("test_device_valid", "session123", duration_hours=24)
     with pytest.raises(WebSocketDisconnect) as exc:
         with client.websocket_connect("/ws/sidecar") as websocket:
-            # Send valid token for test_device_valid, but claim to be different device
             websocket.send_json({"token": token, "device_id": "some_other_device"})
             websocket.receive_text()
     assert exc.value.code == 1008
     assert "Token device mismatch" in exc.value.reason
+
+def test_sidecar_rejects_unknown_device():
+    token = issue_device_token("unknown_device", "session123", duration_hours=24)
+    with pytest.raises(WebSocketDisconnect) as exc:
+        with client.websocket_connect("/ws/sidecar") as websocket:
+            websocket.send_json({"token": token, "device_id": "unknown_device"})
+            websocket.receive_text()
+    assert exc.value.code == 1008
+    assert "Unknown device" in exc.value.reason
 
 def test_sidecar_rejects_revoked_device():
     token = issue_device_token("test_device_revoked", "session123", duration_hours=24)
@@ -98,12 +124,35 @@ def test_sidecar_rejects_revoked_device():
     assert exc.value.code == 1008
     assert "Device revoked" in exc.value.reason
 
-def test_sidecar_accepts_valid_matching_device():
+def test_sidecar_accepts_valid_matching_device(setup_runtime):
     token = issue_device_token("test_device_valid", "session123", duration_hours=24)
-    # The websocket should not disconnect. It should accept the connection and sleep.
-    # Since we can't easily test a long-lived websocket in a simple test without hanging,
-    # we just verify it connects without raising an exception right away.
-    with client.websocket_connect("/ws/sidecar") as websocket:
-        websocket.send_json({"token": token, "device_id": "test_device_valid"})
-        # It's accepted if it doesn't immediately close with 1008
-        pass
+    
+    rt = setup_runtime
+    import threading
+    
+    # We will connect and immediately close to verify it got registered
+    def _client_thread():
+        try:
+            with client.websocket_connect("/ws/sidecar") as websocket:
+                websocket.send_json({"token": token, "device_id": "test_device_valid"})
+                # Wait briefly so server registers it
+                import time
+                time.sleep(0.5)
+        except Exception:
+            pass
+
+    t = threading.Thread(target=_client_thread)
+    t.start()
+    
+    # Poll for registration
+    import time
+    registered = False
+    for _ in range(10):
+        ch = rt.channel_manager.get_channel("sidecar_test_device_valid")
+        if ch:
+            registered = True
+            break
+        time.sleep(0.1)
+        
+    t.join()
+    assert registered, "Authenticated channel was not successfully registered in ChannelManager"

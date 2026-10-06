@@ -37,6 +37,11 @@ class MarkRuntime:
         """Phase 1: Configure system and register services."""
         logger.info(f"[Runtime] Initializing MARK XLVIII (Mode: {self.mode.name})")
         # TODO: Register core services (Memory, Policy, Orchestrator, WS/API)
+        from core.runtime.services import ApiService
+        self.services.register(ApiService(port=8000))
+        from core.runtime.api import set_runtime
+        set_runtime(self)
+
         
     async def start(self):
         """Phase 2: Start all registered services in order."""

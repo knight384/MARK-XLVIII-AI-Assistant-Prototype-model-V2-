@@ -112,3 +112,38 @@ class ServiceRegistry:
         
     def has(self, name: str) -> bool:
         return name in self._services
+import uvicorn
+import asyncio
+from core.runtime.services import Service, ServiceStatus
+
+class ApiService:
+    @property
+    def name(self) -> str:
+        return "ApiService"
+        
+    def __init__(self, port=8000):
+        self.port = port
+        self._server = None
+        self._task = None
+        self._status = ServiceStatus.STOPPED
+
+    async def start(self) -> None:
+        self._status = ServiceStatus.STARTING
+        config = uvicorn.Config("core.runtime.api:app", host="0.0.0.0", port=self.port, log_level="info")
+        self._server = uvicorn.Server(config)
+        
+        # Override uvicorn's signal handlers so it doesn't kill the whole process
+        self._server.config.setup_event_loop()
+        self._task = asyncio.create_task(self._server.serve())
+        self._status = ServiceStatus.RUNNING
+        
+    async def stop(self) -> None:
+        self._status = ServiceStatus.STOPPING
+        if self._server:
+            self._server.should_exit = True
+            if self._task:
+                await self._task
+        self._status = ServiceStatus.STOPPED
+        
+    def status(self) -> ServiceStatus:
+        return self._status

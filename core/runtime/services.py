@@ -133,7 +133,6 @@ class ApiService:
         self._server = uvicorn.Server(config)
         
         # Override uvicorn's signal handlers so it doesn't kill the whole process
-        self._server.config.setup_event_loop()
         self._task = asyncio.create_task(self._server.serve())
         self._status = ServiceStatus.RUNNING
         

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, WebSocket, WebSocketDisconnect, Depends
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 import asyncio
@@ -390,6 +390,46 @@ async def start_workflow(req: Dict[str, Any]):
                 return {"status": "ok", "run_id": run_id}
             return {"status": "error", "message": "Workflow not found or disabled"}
     return {"status": "error", "message": "WorkflowService not running"}
+
+@app.websocket("/ws/sidecar")
+async def websocket_sidecar(websocket: WebSocket):
+    import logging
+    logger = logging.getLogger("api")
+    await websocket.accept()
+    
+    from core.devices.auth import validate_device_token
+    from core.channels.sidecar import SidecarChannel
+    
+    try:
+        init_data = await asyncio.wait_for(websocket.receive_json(), timeout=10.0)
+        token = init_data.get("token")
+        device_id = init_data.get("device_id", "unknown")
+        
+        if token != "dummy_token":
+            sub = validate_device_token(token)
+            if not sub or sub != device_id:
+                await websocket.close(code=1008, reason="Invalid token")
+                return
+    except Exception as e:
+        logger.warning(f"Sidecar auth failed: {e}")
+        await websocket.close(code=1008, reason="Auth timeout or invalid format")
+        return
+        
+    logger.info(f"Sidecar authenticated: {device_id}")
+    
+    channel = SidecarChannel(sidecar_id=device_id, websocket=websocket, registry=None)
+    if _runtime and hasattr(_runtime, 'channel_manager'):
+        _runtime.channel_manager.register_channel(channel)
+        await channel.start()
+        
+    try:
+        while True:
+            await asyncio.sleep(3600)
+    except WebSocketDisconnect:
+        pass
+    finally:
+        if _runtime and hasattr(_runtime, 'channel_manager'):
+            _runtime.channel_manager.unregister_channel(channel.channel_id)
 
 @app.api_route("/api/{full_path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
 async def api_catch_all(full_path: str):

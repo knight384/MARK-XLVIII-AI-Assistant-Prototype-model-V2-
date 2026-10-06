@@ -14,6 +14,10 @@ PHASE_3_TOOL_NAMES = {
     "browser_control", "file_controller", "desktop_control", "code_helper", "dev_agent",
     "computer_control", "game_updater", "flight_finder", "shutdown_jarvis",
     "file_processor", "save_memory",
+    "developer_project_inspect", "developer_code_search", "developer_source_context",
+    "developer_git_status", "developer_git_log", "developer_git_diff",
+    "developer_git_commit", "developer_git_push",
+    "developer_github_repository", "developer_github_create_repository"
 }
 
 

@@ -1,27 +1,19 @@
-import os
 from pathlib import Path
-from dataclasses import dataclass
-from typing import List, Optional, Set, Dict
+from typing import Optional
 
-@dataclass
-class ProjectIndex:
-    root_path: str
-    git_root: Optional[str]
-    languages: List[str]
-    package_managers: List[str]
-    source_directories: List[str]
-    test_directories: List[str]
-    build_configs: List[str]
+from .models import ProjectIndex
 
 class ProjectAnalyzer:
-    """Lightweight repository intelligence abstraction."""
+    """Bounded repository intelligence abstraction."""
     
-    IGNORE_DIRS = {".git", "node_modules", "venv", "__pycache__", "dist", "build", ".pytest_cache", ".idea", ".vscode"}
+    IGNORE_DIRS = {".git", "node_modules", "venv", "__pycache__", "dist", "build", ".pytest_cache", ".idea", ".vscode", "vendor"}
+    MAX_FILES = 10_000
     
     def analyze(self, path: str) -> ProjectIndex:
         root = Path(path).resolve()
-        
-        # 1. Git root
+        if not root.is_dir():
+            raise ValueError(f"Path is not a directory: {root}")
+            
         git_root = self._find_git_root(root)
         
         languages = set()
@@ -30,14 +22,20 @@ class ProjectAnalyzer:
         test_dirs = []
         build_configs = []
         
-        # Top level scan for manifests
+        file_count = 0
+        
+        # Bounded scan
         for item in root.iterdir():
+            if file_count > self.MAX_FILES:
+                break
+                
             if item.is_file():
+                file_count += 1
                 name = item.name
                 if name == "package.json":
                     package_managers.add("npm")
                     languages.add("TypeScript/JavaScript")
-                elif name == "requirements.txt" or name == "pyproject.toml" or name == "setup.py":
+                elif name in ("requirements.txt", "pyproject.toml", "setup.py"):
                     package_managers.add("pip")
                     languages.add("Python")
                 elif name == "pom.xml":
@@ -46,23 +44,24 @@ class ProjectAnalyzer:
                 elif name == "go.mod":
                     package_managers.add("go mod")
                     languages.add("Go")
-                elif name in ["Makefile", "CMakeLists.txt", "build.gradle", "docker-compose.yml"]:
+                elif name in ("Makefile", "CMakeLists.txt", "build.gradle", "docker-compose.yml"):
                     build_configs.append(name)
             elif item.is_dir() and item.name not in self.IGNORE_DIRS:
                 name_lower = item.name.lower()
-                if name_lower in ["src", "source", "app", "lib", "core"]:
+                if name_lower in ("src", "source", "app", "lib", "core", "internal"):
                     src_dirs.append(item.name)
-                elif name_lower in ["tests", "test", "spec", "specs"]:
+                elif name_lower in ("tests", "test", "spec", "specs", "e2e"):
                     test_dirs.append(item.name)
                     
         return ProjectIndex(
             root_path=str(root),
             git_root=str(git_root) if git_root else None,
-            languages=list(languages),
-            package_managers=list(package_managers),
-            source_directories=src_dirs,
-            test_directories=test_dirs,
-            build_configs=build_configs
+            languages=sorted(list(languages)),
+            package_managers=sorted(list(package_managers)),
+            source_directories=sorted(src_dirs),
+            test_directories=sorted(test_dirs),
+            build_configs=sorted(build_configs),
+            file_count=file_count
         )
 
     def _find_git_root(self, current: Path) -> Optional[Path]:

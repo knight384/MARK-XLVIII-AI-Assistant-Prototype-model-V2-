@@ -1,51 +1,45 @@
-import os
 from pathlib import Path
-from typing import List, Optional
-from core.developer.project import ProjectAnalyzer, ProjectIndex
-from core.developer.git import GitIntelligence
 
-class ContextBuilder:
-    """Constructs bounded, developer-specific context assemblies."""
+class SourceContextManager:
+    """Bounded source context retrieval."""
     
-    def __init__(self, repo_path: str):
-        self.repo_path = Path(repo_path).resolve()
-        self.analyzer = ProjectAnalyzer()
-        try:
-            self.git = GitIntelligence(repo_path)
-        except Exception:
-            self.git = None
+    MAX_FILE_SIZE = 1_000_000  # 1MB
+    MAX_LINES = 500
+
+    def __init__(self, workspace_root: str | Path):
+        self.root = Path(workspace_root).resolve()
+        if not self.root.is_dir():
+            raise ValueError(f"Workspace root is not a directory: {self.root}")
+
+    def get_context(self, file_path: str, line_number: int, lines_before: int = 10, lines_after: int = 10) -> str:
+        """Retrieves a bounded excerpt around a specific line."""
+        
+        target = (self.root / file_path).resolve()
+        if self.root not in target.parents and target != self.root:
+            raise ValueError(f"Path traversal detected: {file_path}")
             
-    def build_context(self, task_goal: str, relevant_files: Optional[List[str]] = None) -> str:
-        index = self.analyzer.analyze(str(self.repo_path))
+        if not target.is_file():
+            raise FileNotFoundError(f"File not found: {file_path}")
+            
+        if target.stat().st_size > self.MAX_FILE_SIZE:
+            raise ValueError(f"File too large: {file_path}")
+            
+        if lines_before + lines_after + 1 > self.MAX_LINES:
+            raise ValueError(f"Context window too large (max {self.MAX_LINES} lines).")
+            
+        start_line = max(1, line_number - lines_before)
+        end_line = line_number + lines_after
         
-        context_parts = []
-        context_parts.append(f"PROJECT CONTEXT:\nRoot: {index.root_path}")
-        context_parts.append(f"Languages: {', '.join(index.languages)}")
-        context_parts.append(f"Source Dirs: {', '.join(index.source_directories)}")
-        context_parts.append(f"Test Dirs: {', '.join(index.test_directories)}")
-        
-        if self.git:
-            try:
-                context_parts.append(f"\nGIT STATE:\nBranch: {self.git.current_branch()}")
-                status = self.git.status()
-                if status:
-                    context_parts.append(f"Pending Changes:\n{status}")
-            except Exception:
-                pass
-                
-        # Attach bounded file contents
-        if relevant_files:
-            context_parts.append("\nRELEVANT FILES:")
-            for rel_file in relevant_files[:5]: # Bounded strictly to 5 files
-                file_path = self.repo_path / rel_file
-                if file_path.is_file():
-                    try:
-                        content = file_path.read_text(encoding="utf-8")
-                        # Bound individual file sizes
-                        if len(content) > 15000:
-                            content = content[:15000] + "\n...[TRUNCATED]"
-                        context_parts.append(f"--- {rel_file} ---\n{content}\n")
-                    except Exception as e:
-                        context_parts.append(f"--- {rel_file} ---\nError reading file: {e}\n")
-        
-        return "\n".join(context_parts)
+        excerpt = []
+        try:
+            with open(target, "r", encoding="utf-8") as f:
+                for i, line in enumerate(f, 1):
+                    if i > end_line:
+                        break
+                    if i >= start_line:
+                        marker = ">> " if i == line_number else "   "
+                        excerpt.append(f"{i:4d} {marker}{line.rstrip()}")
+        except UnicodeDecodeError:
+            raise ValueError(f"Cannot decode file as text: {file_path}")
+            
+        return "\n".join(excerpt)

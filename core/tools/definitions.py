@@ -679,8 +679,14 @@ class ShutdownJarvisTool(Tool):
 
 
 # ============================================================================
-# Registration
 # ============================================================================
+from core.developer.tools import (
+    DeveloperProjectInspectTool, DeveloperCodeSearchTool, DeveloperSourceContextTool,
+    DeveloperGitStatusTool, DeveloperGitLogTool, DeveloperGitDiffTool,
+    DeveloperGitCommitTool, DeveloperGitPushTool,
+    DeveloperGitHubRepositoryTool, DeveloperGitHubCreateRepositoryTool
+)
+
 
 def register_all_tools(registry) -> None:
     """Registers every production tool. This is the single canonical list —
@@ -692,6 +698,11 @@ def register_all_tools(registry) -> None:
         FileProcessorTool(), ComputerControlTool(), GameUpdaterTool(), FlightFinderTool(),
         SystemStatusTool(), SaveMemoryTool(), ScreenProcessTool(), CloseCameraTool(),
         ShutdownJarvisTool(),
+        # Phase 2 Developer tools
+        DeveloperProjectInspectTool(), DeveloperCodeSearchTool(), DeveloperSourceContextTool(),
+        DeveloperGitStatusTool(), DeveloperGitLogTool(), DeveloperGitDiffTool(),
+        DeveloperGitCommitTool(), DeveloperGitPushTool(),
+        DeveloperGitHubRepositoryTool(), DeveloperGitHubCreateRepositoryTool(),
     ]
     for tool in tools:
         registry.register(tool)

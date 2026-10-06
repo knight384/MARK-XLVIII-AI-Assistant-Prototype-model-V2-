@@ -70,17 +70,17 @@ class ModelRouter:
     ) -> RoutingDecision:
         if isinstance(task_type, ModelTier):
             task_type = task_type.value
+        required = set(required_capabilities) | set(_REQUIRED_CAPABILITIES.get(task_type, ()))
+
         # 1. Explicit override always wins if the target is actually available (Part 17).
         if override_provider:
-            decision = self._try_explicit(override_provider, override_model, reason="explicit user override")
+            decision = self._try_explicit(override_provider, override_model, required, reason="explicit user override")
             if decision:
                 return decision
             logger.warning(
-                "Requested provider/model override ('%s'/'%s') is unavailable — falling back to routing.",
-                override_provider, override_model,
+                "Requested provider/model override ('%s'/'%s') is unavailable or lacks required capabilities %s.",
+                override_provider, override_model, required
             )
-
-        required = set(required_capabilities) | set(_REQUIRED_CAPABILITIES.get(task_type, ()))
 
         # 2. Privacy-forced local routing (hybrid mode, Part 18).
         if privacy == "local":
@@ -120,13 +120,18 @@ class ModelRouter:
             return [(provider_id, model_id)]
         return None
 
-    def _try_explicit(self, provider_id: str, model_id: str | None, reason: str) -> RoutingDecision | None:
+    def _try_explicit(self, provider_id: str, model_id: str | None, required: set[str], reason: str) -> RoutingDecision | None:
         provider = self._registry.get(provider_id)
         if provider is None or not provider.is_configured():
             return None
         resolved_model = model_id or self._default_model_for(provider_id)
         info = provider.get_model(resolved_model) if resolved_model else None
         capabilities = info.capabilities if info else None
+        
+        if required and capabilities:
+            if not capabilities.supports(*required):
+                return None
+                
         return RoutingDecision(provider_id=provider_id, model_id=resolved_model,
                                 capabilities=capabilities, reason=reason)
 

@@ -19,6 +19,7 @@ class Message:
     content: str
     name: str | None = None            # tool name, when role == "tool"
     tool_call_id: str | None = None    # links a tool result back to its call
+    multimodal_parts: list[dict] | None = None # e.g. [{"type": "image", "data": bytes, "mime_type": "image/png"}]
 
 
 @dataclass

@@ -21,6 +21,8 @@ class ModelCapabilities:
     reasoning: bool = False
     realtime_audio_session: bool = False
     local_execution: bool = False
+    audio_input: bool = False
+    video_input: bool = False
 
     def supports(self, *required: str) -> bool:
         """True if every named capability is set on this instance."""

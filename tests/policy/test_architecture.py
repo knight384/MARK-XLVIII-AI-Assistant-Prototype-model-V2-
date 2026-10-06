@@ -55,7 +55,7 @@ def test_only_one_tool_executor_class_exists():
                 if isinstance(node, ast.ClassDef) and "ToolExecutor" in node.name:
                     violations.append(f"{py_file.relative_to(REPO_ROOT)}: defines class {node.name}")
     assert len(violations) == 1, f"Expected exactly one ToolExecutor class, found: {violations}"
-    assert "core/tools/executor.py" in violations[0]
+    assert "core/tools/executor.py" in violations[0].replace("\\", "/")
 
 
 def test_tool_executor_consults_policy_engine():

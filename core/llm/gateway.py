@@ -46,8 +46,20 @@ class ModelGateway:
         model_id: str | None = None,
         fallback_policy: FallbackPolicy | None = None,
     ) -> ModelResponse:
+        # Detect multimodal required capabilities
+        dynamic_reqs = list(required_capabilities)
+        for msg in request.messages:
+            if msg.multimodal_parts:
+                for part in msg.multimodal_parts:
+                    if part.get("type") in ("image", "video_frame", "screen_frame"):
+                        if "vision" not in dynamic_reqs:
+                            dynamic_reqs.append("vision")
+                    elif part.get("type") == "audio":
+                        if "audio_input" not in dynamic_reqs:
+                            dynamic_reqs.append("audio_input")
+                            
         decision = self._router.route(
-            task_type=task_type, required_capabilities=required_capabilities,
+            task_type=task_type, required_capabilities=tuple(dynamic_reqs),
             privacy=privacy, override_provider=provider_id, override_model=model_id,
         )
         try:

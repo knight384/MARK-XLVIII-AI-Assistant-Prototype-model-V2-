@@ -11,6 +11,8 @@ class ChannelManager:
     def __init__(self):
         self._channels: Dict[str, Channel] = {}
         self._running = False
+        from core.multimodal.events import PrivacyControls
+        self.privacy_controls = PrivacyControls()
         
     def register_channel(self, channel: Channel):
         if channel.channel_id in self._channels:
@@ -33,11 +35,21 @@ class ChannelManager:
 
     async def _handle_channel_message(self, msg: ChannelMessage):
         """Route incoming messages from any channel to the appropriate MARK Runtime service."""
-        logger.info(f"[ChannelManager] Received message from {msg.source}: {msg.content}")
+        from core.channels.base import ContentType
+        
+        # Privacy check for raw media
+        if msg.content_type in (ContentType.IMAGE, ContentType.VIDEO_FRAME, ContentType.SCREEN_FRAME, ContentType.AUDIO):
+            if not self.privacy_controls.persist_raw_media:
+                # We would normally pass this directly to memory but now we drop it or only keep refs
+                pass
+                
+        logger.info(f"[ChannelManager] Received message from {msg.source}: type={msg.content_type}")
+        
         # In a full implementation, this routes through the EventBus, PolicyEngine,
         # or directly to an LLM Session/Agent for response.
         # For now we broadcast it out.
-        await self.broadcast_text(f"MARK received: {msg.content}")
+        if msg.content_type == ContentType.TEXT:
+            await self.broadcast_text(f"MARK received: {msg.content}")
 
     async def broadcast_text(self, text: str):
         """Broadcast text to all connected channels."""

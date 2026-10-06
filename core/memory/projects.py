@@ -24,15 +24,17 @@ def derive_project_id(repo_path: str | Path, explicit_id: str | None = None) -> 
         return explicit_id
 
     repo_path = Path(repo_path).resolve()
-    try:
-        remote = subprocess.run(
-            ["git", "-C", str(repo_path), "remote", "get-url", "origin"],
-            capture_output=True, text=True, timeout=3,
-        )
-        if remote.returncode == 0 and remote.stdout.strip():
-            return "git:" + hashlib.sha1(remote.stdout.strip().encode()).hexdigest()[:16]
-    except Exception:
-        pass  # git not available / not a repo / timed out — fall through to path-based id
+    
+    if (repo_path / ".git").exists():
+        try:
+            remote = subprocess.run(
+                ["git", "-C", str(repo_path), "remote", "get-url", "origin"],
+                capture_output=True, text=True, timeout=3,
+            )
+            if remote.returncode == 0 and remote.stdout.strip():
+                return "git:" + hashlib.sha1(remote.stdout.strip().encode()).hexdigest()[:16]
+        except Exception:
+            pass  # git not available / timed out — fall through to path-based id
 
     return "path:" + hashlib.sha1(str(repo_path).encode()).hexdigest()[:16]
 

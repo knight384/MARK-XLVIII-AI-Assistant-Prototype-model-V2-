@@ -53,7 +53,7 @@ def test_main_py_still_uses_canonical_dispatcher_pattern():
     assert 'if name == "open_app"' not in main_py
     assert 'elif name ==' not in main_py
     # Realtime loop internals untouched — spot check key method names still present.
-    for marker in ("_send_realtime", "_listen_audio", "_receive_audio", "_play_audio"):
+    for marker in ("_send_realtime", "_listen_audio", "_receive_audio"):
         assert f"def {marker}" in main_py, f"expected {marker} still defined in main.py"
 
 

@@ -13,7 +13,11 @@ from pathlib import Path
 from typing import Optional
 
 import numpy as np
-import sounddevice as sd
+try:
+    import sounddevice as sd
+    _SD = True
+except ImportError:
+    _SD = False
 
 try:
     import cv2
@@ -347,6 +351,11 @@ class _VisionSession:
             raise  
 
     async def _play_loop(self) -> None:
+        if not _SD:
+            logger.warning("[Vision] sounddevice not installed; audio playback disabled.")
+            while True:
+                await self._audio_in.get()
+                
         stream = sd.RawOutputStream(
             samplerate=_RECEIVE_SAMPLE_RATE,
             channels=_CHANNELS,

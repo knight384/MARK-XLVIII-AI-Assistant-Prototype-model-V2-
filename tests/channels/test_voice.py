@@ -22,6 +22,11 @@ class MockTTSAdapter(TTSAdapter):
 
 @pytest.mark.asyncio
 async def test_voice_channel_lifecycle():
+    try:
+        import sounddevice
+    except ImportError:
+        pytest.skip("sounddevice is not available")
+    
     stt = MockSTTAdapter()
     tts = MockTTSAdapter()
     vc = VoiceChannel("test_voice", stt, tts)

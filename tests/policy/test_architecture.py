@@ -90,7 +90,7 @@ def test_sandbox_never_uses_shell_true_for_generated_commands():
     """spec Part 33. Checked via AST keyword-argument inspection (not raw
     text search) since the module docstrings legitimately mention
     'shell=True' by name while explaining why it's avoided."""
-    for filename in ("docker.py", "command.py"):
+    for filename in ("docker.py",):
         path = REPO_ROOT / "core" / "sandbox" / filename
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):

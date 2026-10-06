@@ -424,11 +424,10 @@ async def websocket_sidecar(websocket: WebSocket):
         token = init_data.get("token")
         device_id = init_data.get("device_id", "unknown")
         
-        if token != "dummy_token":
-            payload = validate_device_token(token)
-            if not payload:
-                await websocket.close(code=1008, reason="Invalid or expired token")
-                return
+        payload = validate_device_token(token)
+        if not payload:
+            await websocket.close(code=1008, reason="Invalid or expired token")
+            return
             sub = payload.get("sub")
             if not sub or sub != device_id:
                 await websocket.close(code=1008, reason="Token device mismatch")

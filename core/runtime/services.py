@@ -129,7 +129,7 @@ class ApiService:
 
     async def start(self) -> None:
         self._status = ServiceStatus.STARTING
-        config = uvicorn.Config("core.runtime.api:app", host="0.0.0.0", port=self.port, log_level="info")
+        config = uvicorn.Config("core.runtime.api:app", host="127.0.0.1", port=self.port, log_level="info")
         self._server = uvicorn.Server(config)
         
         # Override uvicorn's signal handlers so it doesn't kill the whole process

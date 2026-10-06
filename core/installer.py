@@ -33,7 +33,6 @@ _CORE: list[tuple[str, str]] = [
     ("send2trash",         "send2trash"),
     ("pptx",               "python-pptx"),
     ("youtube_transcript_api", "youtube-transcript-api"),
-    ("PyQt6",              "PyQt6"),
     ("google.genai",       "google-genai"),
     # Phase 1 additions -- previously installed ad hoc / not at all by this
     # installer (see Phase 0 audit): dashboard server deps, and the secret

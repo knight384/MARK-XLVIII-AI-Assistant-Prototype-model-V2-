@@ -16,8 +16,8 @@
 # macOS/Linux too.
 
 # --- UI ---
-PyQt6>=6.6
-
+# PyQt6 is optional and not distributed due to GPLv3 licensing. 
+# Run in headless mode or install manually for legacy UI.
 # --- Core AI / audio / vision ---
 google-genai>=0.3
 sounddevice>=0.4.6

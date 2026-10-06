@@ -8,6 +8,14 @@ from core.devices.models import DeviceIdentity, DeviceStatus, ConnectionState, S
 
 logger = logging.getLogger(__name__)
 
+_default_registry = None
+
+def get_default_device_registry():
+    global _default_registry
+    if _default_registry is None:
+        _default_registry = DeviceRegistry()
+    return _default_registry
+
 class DeviceRegistry:
     def __init__(self, db_path: str = ".data/devices.db"):
         self.db_path = db_path

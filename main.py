@@ -27,7 +27,6 @@ from datetime import datetime
 from pathlib import Path
 
 from google.genai import types
-from ui import JarvisUI
 from memory.memory_manager import (
     load_memory, format_memory_for_prompt,
 )
@@ -111,7 +110,7 @@ TOOL_DECLARATIONS = _tool_registry.generate_gemini_declarations()
 
 class JarvisLive:
 
-    def __init__(self, ui: JarvisUI):
+    def __init__(self, ui: "Any"):
         self.ui             = ui
         self.session              = None
         self.audio_in_queue       = None
@@ -779,7 +778,13 @@ def main():
         except KeyboardInterrupt:
             logger.info("\n🔴 Shutting down...")
     else:
-        ui = JarvisUI("face.png")
+        try:
+            from ui import JarvisUI
+            ui = JarvisUI("face.png")
+        except ImportError:
+            logger.warning("PyQt6 not found or ui import failed. Falling back to headless mode.")
+            sys.argv.append("--headless")
+            return main()
 
         def runner():
             async def desktop_runner():

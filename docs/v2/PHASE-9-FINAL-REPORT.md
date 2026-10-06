@@ -8,8 +8,8 @@ All identified vulnerabilities during the audit have been successfully verified 
 ## Audit Findings & Remediation
 
 ### 1. Hardcoded Credentials & Authentication Bypasses (REMEDIATED)
-- **Finding**: The `core/runtime/api.py` endpoint for Sidecar WebSocket authentication (`/ws/sidecar`) contained a hardcoded bypass (`token != "dummy_token"`), allowing unauthorized device registration and bypassing HS256 JWT checks.
-- **Remediation**: The `dummy_token` conditional was successfully removed. JWT signature verification and device-revocation checks are now mandatory for all connections.
+- **Finding**: The `core/runtime/api.py` endpoint for Sidecar WebSocket authentication (`/ws/sidecar`) contained a hardcoded bypass (`token != "dummy_token"`), allowing unauthorized device registration and bypassing HS256 JWT checks. Additionally, identity mismatches and revocation checks were bypassed due to incorrect control flow.
+- **Remediation**: The `dummy_token` conditional was successfully removed. JWT signature verification and device-revocation checks are now mandatory for all connections. Identity mismatches correctly abort the connection before processing.
 
 ### 2. Network Exposure & Unauthenticated API (REMEDIATED)
 - **Finding**: The core FastApi service (`ApiService` in `core/runtime/services.py`) was binding to `0.0.0.0` by default. Given the lack of robust API key / OAuth2 protection on core REST endpoints (e.g., `/api/tasks`), this introduced remote execution risks.
@@ -25,11 +25,11 @@ All identified vulnerabilities during the audit have been successfully verified 
 - **Finding**: The `docker.py` sandbox execution mounts a local workspace. 
 - **Verification**: Path traversal was found to be comprehensively prevented by `.resolve()` logic in `SandboxWorkspace`. The Docker execution explicitly drops capabilities and prevents privilege escalation.
 
-### 5. Licensing (OPEN ADVISORY)
-- **Finding**: `PyQt6` is defined as a dependency and actively utilized in `ui.py`. PyQt6 is licensed under **GPLv3**, which is broadly incompatible with proprietary or RSALv2-derived distribution.
-- **Next Steps**: A strategic decision must be made regarding UI distribution before Phase 10 packaging. Replacing PyQt6 or isolating it via a separate open-source package is recommended.
+### 5. Licensing (REMEDIATED)
+- **Finding**: `PyQt6` was defined as a dependency and actively utilized in `ui.py`. PyQt6 is licensed under **GPLv3**, which is broadly incompatible with proprietary or RSALv2-derived distribution.
+- **Remediation**: Option B was implemented. PyQt6 has been made strictly optional. It was removed from the core dependencies in `installer.py` and `requirements.txt`. The application `main.py` gracefully degrades to headless mode (`HeadlessUI`) if `PyQt6` is not available, allowing distribution of the React/FastAPI-based V2 without packaging the GPL-licensed PyQt6.
 
 ## Conclusion
-The MARK XLVIII V2 repository has successfully completed the Phase 9 gate. The codebase is clean, secrets have been scrubbed, major authentication bypasses have been plugged, and the isolation capabilities operate as designed.
+The MARK XLVIII V2 repository has successfully completed the Phase 9 gate. The codebase is clean, secrets have been scrubbed, major authentication bypasses have been plugged, licensing conflicts have been resolved, and the isolation capabilities operate as designed.
 
 **STATUS**: COMPLETE (Approved for Phase 10).

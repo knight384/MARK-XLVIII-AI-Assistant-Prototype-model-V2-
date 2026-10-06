@@ -428,28 +428,29 @@ async def websocket_sidecar(websocket: WebSocket):
         if not payload:
             await websocket.close(code=1008, reason="Invalid or expired token")
             return
-            sub = payload.get("sub")
-            if not sub or sub != device_id:
-                await websocket.close(code=1008, reason="Token device mismatch")
-                return
             
-            # Check revocation
-            from core.devices.registry import get_default_device_registry
-            from core.devices.models import DeviceStatus
-            reg = get_default_device_registry()
-            dev = reg.get_device(device_id)
-            if dev and dev.status == DeviceStatus.REVOKED:
-                await websocket.close(code=1008, reason="Device revoked")
-                return
+        sub = payload.get("sub")
+        if not sub or sub != device_id:
+            await websocket.close(code=1008, reason="Token device mismatch")
+            return
+        
+        # Check revocation
+        from core.devices.registry import get_default_device_registry
+        from core.devices.models import DeviceStatus
+        reg = get_default_device_registry()
+        dev = reg.get_device(device_id)
+        if dev and dev.status == DeviceStatus.REVOKED:
+            await websocket.close(code=1008, reason="Device revoked")
+            return
 
     except Exception as e:
         logger.warning(f"Sidecar auth failed: {e}")
         await websocket.close(code=1008, reason="Auth timeout or invalid format")
         return
         
-    logger.info(f"Sidecar authenticated: {device_id}")
+    logger.info(f"Sidecar authenticated: {sub}")
     
-    channel = SidecarChannel(sidecar_id=device_id, websocket=websocket, registry=None)
+    channel = SidecarChannel(sidecar_id=sub, websocket=websocket, registry=None)
     if _runtime and hasattr(_runtime, 'channel_manager'):
         _runtime.channel_manager.register_channel(channel)
         await channel.start()

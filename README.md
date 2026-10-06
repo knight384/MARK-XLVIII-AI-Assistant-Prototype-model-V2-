@@ -1,40 +1,34 @@
-# JARVIS / MARK XLVIII
+# MARK XLVIII V2
 
-A desktop AI assistant with realtime voice interaction (Google Gemini Live), a
-PyQt6 HUD, and a broad set of tools: app launching, browser automation, file
-management, computer control, a developer/coding agent, reminders, messaging,
-system monitoring, and a phone-accessible remote-control dashboard.
+A modern, highly-modular autonomous AI assistant platform. This represents the stable V2 Release Candidate (Phase 10), completing the architectural migration from the V1 prototype into a robust, secure, event-driven, and multi-agent system.
 
 ## Status
 
-This repository has completed **Phase 1** of a multi-phase refactor (see
-`JARVIS_PHASE0_AUDIT.md` for the full audit and roadmap). Phase 1 is a
-foundation/hygiene pass — it centralizes configuration, secret storage, TLS
-certificate handling, and logging, **without changing any voice, tool, or UI
-behavior**. Later phases (Model Gateway, Tool Registry, multi-agent runtime,
-security sandboxing, etc.) are described in the audit but not yet implemented.
+MARK XLVIII V2 has successfully passed a 10-phase structural, security, and performance overhaul. 
+Key architecture components now include:
+- **Event-Driven Workflow Engine**: Robust offline/background processing queues.
+- **Docker Sandboxing**: Protected execution environments for all untrusted code/tool invocations.
+- **Developer Subsystems**: Secure code/repository inspection boundaries.
+- **Go Sidecar Control Plane**: Scalable remote-device capabilities over authenticated WebSockets.
+- **Pluggable Frontend**: Vite/React-based UI degrading gracefully into native CLI.
 
-## Architecture (current)
+## Architecture 
 
 ```
-ui.py (PyQt6 HUD)
+ui/ (React / Vite Frontend)
    │
-main.py — JarvisLive: a persistent Gemini Live (realtime audio) session
-   │        with a 19-tool function-calling dispatcher
+main.py — Entrypoint. Degrades to Headless CLI if PyQt6 is absent.
    │
-actions/*.py — one module per tool (browser control, file management,
-   │            computer control, developer agent, reminders, etc.)
+core/runtime/ — Central orchestrator, API surface (127.0.0.1:8000), workflow engine
    │
-dashboard/server.py — FastAPI remote-control web server (phone/second device)
+core/sandbox/ — Docker-isolated execution layer
    │
-core/config/ — centralized configuration & secret storage (Phase 1)
-core/logging_setup.py — centralized logging (Phase 1)
-memory/ — flat JSON user-preferences store
+dashboard/server.py — FastAPI remote-control web server (LAN usage only, 0.0.0.0:8000)
+   │
+sidecar/ — Native Go remote-device proxy (communicating over /ws/sidecar)
+   │
+memory/ & .data/ — Local JSON and SQLite state (Persistent and WAL-backed)
 ```
-
-A full architectural breakdown, provider inventory, security assessment, and
-phased roadmap toward a multi-agent / model-agnostic / local-Docker-cloud
-hybrid platform is in `JARVIS_PHASE0_AUDIT.md`.
 
 ## Installation
 
@@ -45,49 +39,39 @@ pip install -r requirements.txt
 python -m playwright install chromium   # one-time, for browser automation
 ```
 
-`requirements.txt` is the source of truth for dependencies. `core/installer.py`
-remains as a convenience fallback that auto-installs missing packages on
-first launch, but is not the canonical way to set up an environment anymore.
+*Note: The older `PyQt6` dependency is no longer actively bundled to comply with GPLv3 open source boundaries. V2 is designed to run completely headless or through the local web dashboard.*
 
 ## Configuration
 
-On first launch, the app's setup wizard asks for your Gemini API key and OS.
-This is stored via a centralized configuration service (`core/config/`):
-
-- **Secrets** (currently: your Gemini API key) are stored via your OS
-  keychain/credential manager (through the optional `keyring` package) when
-  available, or in a local file at `config/secrets.json` — **never** in a
-  file tracked by git.
-- **Non-secret settings** (OS, STT/TTS engine choice, dashboard port, cached
-  camera index, etc.) live in `config/app_config.json`.
-
-If you have an older copy of this repo with `config/api_keys.json` still
-present, it is automatically and non-destructively migrated the first time
-the new config service runs (see `DEVELOPMENT.md` for details). The original
-file is left in place, just no longer read.
+Secrets are managed centrally via `.env` or the OS keyring if deployed.
+- **Data storage** is routed explicitly to `.data/` and is fully gitignored. 
+- **Workflows** persist via `.data/workflows.sqlite`. 
 
 ## Running locally
 
 ```bash
 python main.py
 ```
+This spawns the Core Backend, Workflow worker threads, and optional UI.
 
 ## Remote dashboard (phone control)
 
-The dashboard serves a local web UI reachable from your phone on the same
-network, with token-based pairing. It generates its own local self-signed
-TLS certificate on first run (see `SECURITY.md` — this is for local/
-self-hosted use, not public Internet exposure).
+The dashboard serves a local web UI reachable from your phone on the same network.
+- **Authentication**: Requires a one-time setup code (via QR).
+- **Encryption**: Employs mandatory Application-Layer AES-256-CBC encryption to prohibit network eavesdropping.
+- **Security Boundary**: Runs as a separate Uvicorn instance from the Core API (`127.0.0.1:8000`), ensuring that the primary REST control surface cannot be accessed via the LAN Dashboard.
 
 ## Security
 
-Please read `SECURITY.md` before exposing this application beyond your own
-local network. It has broad computer-control and code-execution capabilities
-that are appropriate for a trusted single-user local assistant, but have
-**not** yet been hardened for untrusted or multi-user/public deployment —
-that work is scoped for a later phase.
+V2 enforces a structured Threat Model (`docs/v2/PHASE-9-THREAT-MODEL.md`).
+- **Sandboxing**: Docker isolates the filesystem. If Docker is absent, code execution tools fail closed.
+- **Sidecar Auth**: Reject all unauthorized devices strictly through JWT validation and Device Registry mapping.
+- **Execution Approvals**: Protected tools enforce a Mandatory Policy Approval loop prior to invocation.
 
 ## Development
 
-See `DEVELOPMENT.md` for project structure, running tests, and contribution
-notes.
+See `DEVELOPMENT.md` for project structure, running tests, and contribution notes.
+All test runs must cleanly pass without `shell=True` warnings or bypasses:
+```bash
+python -m pytest tests -v
+```

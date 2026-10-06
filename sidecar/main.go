@@ -29,8 +29,7 @@ func main() {
 	// In a real application, token is obtained securely via enrollment
 	token := os.Getenv("SIDECAR_TOKEN")
 	if token == "" {
-		log.Println("Warning: SIDECAR_TOKEN environment variable not set. Using dummy token for demonstration.")
-		token = "dummy_token"
+		log.Println("Warning: SIDECAR_TOKEN environment variable not set. Connection will likely be rejected.")
 	}
 
 	wsURL := os.Getenv("SIDECAR_WS_URL")
